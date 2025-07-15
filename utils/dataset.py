@@ -4,6 +4,8 @@ from torch.utils.data import Dataset
 import torchaudio
 import torchaudio.transforms as T
 from tqdm import tqdm
+from glob import glob
+import os
 
 # [{idx : {encoded_text : Tensor, wav_path : text} }]
 
@@ -35,7 +37,8 @@ class Vocab:
     def __len__(self):
         return len(self.vocab)
 
-def compute_cmvn(dataset, sample_rate=16000):
+def compute_gmvn(dataset, sample_rate=16000):
+    wav_files = glob(os.path.join(dataset, "**", "*.wav"), recursive=True)
     mel_extractor = T.MelSpectrogram(
         sample_rate=sample_rate,
         n_fft=512,
@@ -48,23 +51,25 @@ def compute_cmvn(dataset, sample_rate=16000):
     sum_squares = torch.zeros(192)
     total_frames = 0
 
-    for waveform in tqdm(dataset):  # dataset là list/tập của waveform tensors
+    for file in tqdm(wav_files):  # dataset là list/tập của waveform tensors
         with torch.no_grad():
-            mel = mel_extractor(waveform.unsqueeze(0))  # [1, 80, T]
+            waveform, sr = torchaudio.load(file)
+            mel = mel_extractor(waveform)  # [1, 192, T]
             log_mel = torchaudio.functional.amplitude_to_DB(
                 mel, multiplier=10.0, amin=1e-10, db_multiplier=0
-            ).squeeze(0)  # [80, T]
+            ).squeeze(0)  # [192, T]
 
             total_frames += log_mel.shape[1]
             sum_feats += log_mel.sum(dim=1)
             sum_squares += (log_mel ** 2).sum(dim=1)
 
     mean = sum_feats / total_frames
-    std = (sum_squares / total_frames - mean**2).sqrt()
+    std = (sum_squares / total_frames - mean ** 2).sqrt()
+
     return mean, std
 
 class Speech2Text(Dataset):
-    def __init__(self, json_path, vocab_path, cmvn_stats = None):
+    def __init__(self, json_path, vocab_path, gmvn_mean = None, gmvn_std = None):
         super().__init__()
         self.data = load_json(json_path)
         self.vocab = Vocab(vocab_path)
@@ -72,10 +77,9 @@ class Speech2Text(Dataset):
         self.eos_token = self.vocab.get_eos_token()
         self.pad_token = self.vocab.get_pad_token()
         self.unk_token = self.vocab.get_unk_token()
-        
-        # stats = torch.load(cmvn_stats) 
-        # self.cmvn_mean = stats['mean']
-        # self.cmvn_std = stats['std']
+
+        self.gmvn_mean = gmvn_mean
+        self.gmvn_std = gmvn_std
             
     def __len__(self):
         return len(self.data)
@@ -86,54 +90,17 @@ class Speech2Text(Dataset):
             n_fft=512,
             win_length=int(0.032 * sample_rate),
             hop_length=int(0.01 * sample_rate),
-            n_mels=160,  # ✨ để đúng với Conv1d(in_channels=80)
+            n_mels=192,  
             power=2.0
         )
 
         log_mel = mel_extractor(waveform.unsqueeze(0))
         log_mel = torchaudio.functional.amplitude_to_DB(log_mel, multiplier=10.0, amin=1e-10, db_multiplier=0)
         log_mel = log_mel.squeeze(0)
-
-        mean = log_mel.mean(dim=1, keepdim=True)
-        std = log_mel.std(dim=1, keepdim=True)
-        normalized_log_mel_spec = (log_mel - mean) / (std + 1e-5)
-
-        features = normalized_log_mel_spec.transpose(0, 1) 
-
-        # features = (features - self.cmvn_mean) / (self.cmvn_std + 1e-5)
+        print(f"Log mel shape: {log_mel.shape}")  # Debugging line
+        features = (log_mel - self.gmvn_mean.unsqueeze(1)) / (self.gmvn_std.unsqueeze(1) + 1e-5)
+        features = log_mel.transpose(0, 1)  # [T, 192]
         return features  # [T, 80]
-    
-    # def get_fbank(self, waveform, sample_rate=16000):
-    #     mel_extractor = T.MelSpectrogram(
-    #         sample_rate=sample_rate,
-    #         n_fft=512,
-    #         win_length=int(0.025 * sample_rate),  # 25ms
-    #         hop_length=int(0.010 * sample_rate),  # 10ms
-    #         n_mels=64,  # để còn stack thành 192
-    #         power=2.0
-    #     )
-
-    #     log_mel = mel_extractor(waveform.unsqueeze(0))  # [1, 64, T]
-    #     log_mel = torchaudio.functional.amplitude_to_DB(
-    #         log_mel, multiplier=10.0, amin=1e-10, db_multiplier=0
-    #     )  # [1, 64, T]
-        
-    #     # Frame stacking 3 frames với skip=3
-    #     def stack_frames(feat, stack=3, skip=3):
-    #         B, D, T = feat.shape
-    #         T_new = T - (stack - 1) * skip
-    #         out = []
-    #         for i in range(stack):
-    #             out.append(feat[:, :, i*skip : i*skip + T_new])
-    #         return torch.cat(out, dim=1)  # [B, 64*3, T_new]
-
-    #     stacked = stack_frames(log_mel, stack=3, skip=3)  # [1, 192, T']
-    #     features = stacked.squeeze(0).transpose(0, 1)  # [T', 192]
-
-    #     # Step 3: Apply global CMVN
-    #     features = (features - self.cmvn_mean) / (self.cmvn_std + 1e-5)
-
-    #     return features
     
     def extract_from_path(self, wave_path):
         waveform, sr = torchaudio.load(wave_path)

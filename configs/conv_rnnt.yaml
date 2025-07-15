@@ -11,7 +11,7 @@ model:
     local_cnn_encoder: 
         kernel_size: 5
         stride: 1
-        feature_dim: 160
+        feature_dim: 192
         dim_out: 320
     global_cnn_encoder:
         n_layers: 3
@@ -48,12 +48,12 @@ model:
 training:
   epochs: 100
   batch_size: 2
-  save_path: "workspace/rna/conv-rnnt/save_folder"
+  save_path: "save"
+  voice_path: "C:\\paper\\raw_data\\Vietnamese-Speech-to-Text-datasets\\ViVOS\\voices"
   train_path : "C:\\paper\\raw_data\\Vietnamese-Speech-to-Text-datasets\\ViVOS\\train_w2i.json"
   dev_path : "C:\\paper\\raw_data\\Vietnamese-Speech-to-Text-datasets\\ViVOS\\test_w2i.json"
   test_path : "C:\\paper\\raw_data\\Vietnamese-Speech-to-Text-datasets\\ViVOS\\test_w2i.json"
   vocab_path : "C:\\paper\\raw_data\\Vietnamese-Speech-to-Text-datasets\\ViVOS\\vocab_w2i.json"
-  cmvn_stats : "None"
   reload: True
 
 

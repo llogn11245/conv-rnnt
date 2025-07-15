@@ -1,5 +1,5 @@
 import torch
-from utils.dataset import Speech2Text, speech_collate_fn
+from utils.dataset import Speech2Text, speech_collate_fn, compute_gmvn
 from models.model import Transducer
 from models.loss import RNNTLoss
 import argparse
@@ -70,11 +70,15 @@ def main():
     config = load_config(args.config)
     training_cfg = config['training']
 
+    # ==== Compute gmvn ====
+    gmvn_mean, gmvn_std = compute_gmvn(training_cfg['voice_path'])
+
     # ==== Load Dataset ====
     train_dataset = Speech2Text(
         json_path=training_cfg['train_path'],
         vocab_path=training_cfg['vocab_path'],
-        cmvn_stats=training_cfg['cmvn_stats'],
+        gmvn_mean = gmvn_mean,
+        gmvn_std = gmvn_std,
     )
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
