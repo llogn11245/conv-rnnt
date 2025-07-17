@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
 
+class Swish(nn.Module):
+    def forward(self, x):
+        return x * torch.sigmoid(x)
 
 class BaseDecoder(nn.Module):
     def __init__(self, embedding_size, hidden_size, vocab_size, output_size, n_layers, dropout=0.2):
@@ -16,6 +19,7 @@ class BaseDecoder(nn.Module):
         )
 
         self.output_proj = nn.Linear(hidden_size, output_size)
+        self.swish = Swish()
 
     def forward(self, inputs, length=None, hidden=None):
         embed_inputs = self.embedding(inputs)
@@ -46,7 +50,8 @@ class BaseDecoder(nn.Module):
         padded_output[:, :max_output_size, :] = outputs 
         
         #outputs = self.output_proj(outputs)
-        outputs = self.output_proj(padded_output)
+        # outputs = self.output_proj(padded_output)
+        outputs = self.swish(self.output_proj(padded_output))
         
         return outputs, hidden
 

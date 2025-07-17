@@ -11,21 +11,21 @@ model:
     local_cnn_encoder: 
         kernel_size: 5
         stride: 1
-        feature_dim: 192
-        dim_out: 320
+        feature_dim: 160
+        dim_out: 160
     global_cnn_encoder:
         n_layers: 3
         kernel_size_pw: 1
         kernel_size_dw: 3
         stride: 1
-        input_dim: 320   
-        hidden_dim: 640
+        input_dim: 160   
+        hidden_dim: 320
         n_dropout: 0.1
     dim_out: 320
   enc:
       type: lstm
       hidden_size: 320  
-      output_size: 640
+      output_size: 320
       n_layers: 4
       bidirectional: False
   dec:
@@ -35,11 +35,11 @@ model:
       output_size: 320
       n_layers: 2
   joint:
-      input_size: 960
+      input_size: 640
       inner_size: 512
 
   vocab_size: 4866
-  feature_dim: 320
+  feature_dim: 160
   dropout: 0.3
   name : 'conv-rnnt'
   share_weight: False

@@ -1,6 +1,10 @@
 import torch
 import torch.nn as nn
 
+class Swish(nn.Module):
+    def forward(self, x):
+        return x * torch.sigmoid(x)
+    
 class BaseEncoder(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, n_layers, dropout=0.2, bidirectional=False):
         super(BaseEncoder, self).__init__()
@@ -20,6 +24,7 @@ class BaseEncoder(nn.Module):
         )
 
         # self.input_bn = nn.BatchNorm1d(input_size)
+        self.swish = Swish()
 
     def forward(self, inputs, input_lengths):
         assert inputs.dim() == 3  # [B, T, F]
@@ -58,8 +63,8 @@ class BaseEncoder(nn.Module):
             outputs = outputs
 
 
-        logits = self.output_proj(outputs)
-
+        # logits = self.output_proj(outputs)
+        logits = self.swish(self.output_proj(outputs))  
 
         return logits, hidden
 

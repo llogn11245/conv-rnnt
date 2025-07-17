@@ -71,14 +71,14 @@ def main():
     training_cfg = config['training']
 
     # ==== Compute gmvn ====
-    gmvn_mean, gmvn_std = compute_gmvn(training_cfg['voice_path'])
+    # gmvn_mean, gmvn_std = compute_gmvn(training_cfg['voice_path'])
 
     # ==== Load Dataset ====
     train_dataset = Speech2Text(
         json_path=training_cfg['train_path'],
         vocab_path=training_cfg['vocab_path'],
-        gmvn_mean = gmvn_mean,
-        gmvn_std = gmvn_std,
+        # gmvn_mean = gmvn_mean,
+        # gmvn_std = gmvn_std,
     )
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
