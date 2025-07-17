@@ -6,6 +6,8 @@ import torchaudio.transforms as T
 from tqdm import tqdm
 import numpy as np
 import librosa
+from glob import glob
+import os
 
 # [{idx : {encoded_text : Tensor, wav_path : text} }]
 
@@ -37,36 +39,41 @@ class Vocab:
     def __len__(self):
         return len(self.vocab)
 
-def compute_cmvn(dataset, sample_rate=16000):
-    mel_extractor = T.MelSpectrogram(
-        sample_rate=sample_rate,
-        n_fft=512,
-        win_length=int(0.032 * sample_rate),
-        hop_length=int(0.010 * sample_rate),
-        n_mels=192,
-        power=2.0
-    )
+def compute_gmvn(voice_path, sample_rate=16000):
+    wav_files = glob(os.path.join(voice_path, "**", "*.wav"), recursive=True)
+
+    win_length = int(0.025 * sample_rate)   # 25ms = 400 samples
+    hop_length = int(0.010 * sample_rate)   # 10ms = 160 samples
+    
     sum_feats = torch.zeros(192)
     sum_squares = torch.zeros(192)
     total_frames = 0
 
-    for waveform in tqdm(dataset):  # dataset là list/tập của waveform tensors
+    for file in tqdm(wav_files):  # dataset là list/tập của waveform tensors
         with torch.no_grad():
-            mel = mel_extractor(waveform.unsqueeze(0))  # [1, 80, T]
-            log_mel = torchaudio.functional.amplitude_to_DB(
-                mel, multiplier=10.0, amin=1e-10, db_multiplier=0
-            ).squeeze(0)  # [80, T]
+            waveform, _ = librosa.load(file, sr=sample_rate)
+            stft = librosa.stft(waveform, n_fft=512, win_length=win_length, hop_length=hop_length)
+            mag = np.abs(stft[:64, :])  # Lấy 64 bins đầu tiên (low frequencies)
+            log_mag = np.log1p(mag)  # log(1 + x)
+            log_mag = log_mag.T  # [T, 64]
 
-            total_frames += log_mel.shape[1]
-            sum_feats += log_mel.sum(dim=1)
-            sum_squares += (log_mel ** 2).sum(dim=1)
+            stacked_feats = []
+            for i in range(0, len(log_mag) - 6, 3):  # skip rate = 3
+                stacked = np.concatenate([log_mag[i], log_mag[i+3], log_mag[i+6]])  # [192]
+                stacked_feats.append(stacked)
+
+            stacked_feats = torch.tensor(np.array(stacked_feats), dtype=torch.float32)  # [T', 192]
+
+            total_frames += stacked_feats.shape[0]
+            sum_feats += stacked_feats.sum(dim=0)
+            sum_squares += (stacked_feats ** 2).sum(dim=0)
 
     mean = sum_feats / total_frames
     std = (sum_squares / total_frames - mean**2).sqrt()
     return mean, std
 
 class Speech2Text(Dataset):
-    def __init__(self, json_path, vocab_path, cmvn_stats):
+    def __init__(self, json_path, vocab_path, gmvn_mean, gmvn_std):
         super().__init__()
         self.data = load_json(json_path)
         self.vocab = Vocab(vocab_path)
@@ -75,6 +82,8 @@ class Speech2Text(Dataset):
         self.pad_token = self.vocab.get_pad_token()
         self.unk_token = self.vocab.get_unk_token()
         
+        self.gmvn_mean = gmvn_mean
+        self.gmvn_std = gmvn_std
         # stats = torch.load(cmvn_stats) 
         # self.cmvn_mean = stats['mean']
         # self.cmvn_std = stats['std']
@@ -107,6 +116,8 @@ class Speech2Text(Dataset):
             stacked_feats.append(stacked)
 
         stacked_feats = torch.tensor(np.array(stacked_feats), dtype=torch.float)
+
+        stacked_feats = (stacked_feats - self.gmvn_mean) / (self.gmvn_std + 1e-5)
         return stacked_feats    
 
     def __getitem__(self, idx):
