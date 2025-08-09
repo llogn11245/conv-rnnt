@@ -91,80 +91,80 @@
 #     def __len__(self):
 #         return len(self.data)
 
-#     def extract_features(self, wav_file, sr=16000):
-#         # Load waveform
-#         y, _ = librosa.load(wav_file, sr=sr)
+    def extract_features(self, wav_file, sr=16000):
+        # Load waveform
+        y, _ = librosa.load(wav_file, sr=sr)
 
-#         # Window và hop size
-#         win_length = int(0.025 * sr)   # 25ms = 400 samples
-#         hop_length = int(0.010 * sr)   # 10ms = 160 samples
+        # Window và hop size
+        win_length = int(0.025 * sr)   # 25ms = 400 samples
+        hop_length = int(0.010 * sr)   # 10ms = 160 samples
 
-#         # STFT magnitude
-#         stft = librosa.stft(y, n_fft=512, win_length=win_length, hop_length=hop_length, window='hamming')
-#         mag = np.abs(stft[:64, :])  # Lấy 64 bins đầu tiên (low frequencies)
+        # STFT magnitude
+        stft = librosa.stft(y, n_fft=512, win_length=win_length, hop_length=hop_length, window='hamming')
+        mag = np.abs(stft[:64, :])  # Lấy 64 bins đầu tiên (low frequencies)
 
-#         # Log magnitude
-#         log_mag = np.log1p(mag)  # log(1 + x)
+        # Log magnitude
+        log_mag = np.log1p(mag)  # log(1 + x)
 
-#         # Transpose: (64, T) -> (T, 64)
-#         log_mag = log_mag.T
+        # Transpose: (64, T) -> (T, 64)
+        log_mag = log_mag.T
 
-#         # Frame stacking: 3 frames, skip = 3
-#         stacked_feats = []
-#         for i in range(0, len(log_mag) - 6, 3):  # skip rate = 3
-#             stacked = np.concatenate([log_mag[i], log_mag[i+3], log_mag[i+6]])
-#             stacked_feats.append(stacked)
+        # Frame stacking: 3 frames, skip = 3
+        stacked_feats = []
+        for i in range(0, len(log_mag) - 6, 3):  # skip rate = 3
+            stacked = np.concatenate([log_mag[i], log_mag[i+3], log_mag[i+6]])
+            stacked_feats.append(stacked)
 
-#         stacked_feats = torch.tensor(np.array(stacked_feats), dtype=torch.float)
+        stacked_feats = torch.tensor(np.array(stacked_feats), dtype=torch.float)
 
-#         stacked_feats = (stacked_feats - self.gmvn_mean) / (self.gmvn_std + 1e-5)
-#         return stacked_feats    
+        stacked_feats = (stacked_feats - self.gmvn_mean) / (self.gmvn_std + 1e-5)
+        return stacked_feats    
 
-#     def __getitem__(self, idx):
-#         current_item = self.data[idx]
-#         wav_path = current_item["wav_path"]
-#         encoded_text = torch.tensor(current_item["encoded_text"] + [self.eos_token], dtype=torch.long)
-#         decoder_input = torch.tensor([self.sos_token] + current_item["encoded_text"], dtype=torch.long)
-#         fbank = self.extract_features(wav_path)  # [T, 80]
+    def __getitem__(self, idx):
+        current_item = self.data[idx]
+        wav_path = current_item["wav_path"]
+        encoded_text = torch.tensor(current_item["encoded_text"] + [self.eos_token], dtype=torch.long)
+        decoder_input = torch.tensor([self.sos_token] + current_item["encoded_text"], dtype=torch.long)
+        fbank = self.extract_features(wav_path)  # [T, 80]
         
-#         return {
-#             "text": encoded_text,        # [T_text]
-#             "fbank": fbank,              # [T_audio, 80]
-#             "text_len": len(encoded_text),
-#             "fbank_len": fbank.shape[0],
-#             "decoder_input": decoder_input,  # [T_text + 1]
-#         }
+        return {
+            "text": encoded_text,        # [T_text]
+            "fbank": fbank,              # [T_audio, 80]
+            "text_len": len(encoded_text),
+            "fbank_len": fbank.shape[0],
+            "decoder_input": decoder_input,  # [T_text + 1]
+        }
     
-# from torch.nn.utils.rnn import pad_sequence
+from torch.nn.utils.rnn import pad_sequence
 
-# def calculate_mask(lengths, max_len):
-#     """Tạo mask cho các tensor có chiều dài khác nhau"""
-#     mask = torch.arange(max_len, device=lengths.device)[None, :] < lengths[:, None]
-#     return mask
+def calculate_mask(lengths, max_len):
+    """Tạo mask cho các tensor có chiều dài khác nhau"""
+    mask = torch.arange(max_len, device=lengths.device)[None, :] < lengths[:, None]
+    return mask
 
-# def speech_collate_fn(batch):
-#     decoder_outputs = [torch.tensor(item["decoder_input"]) for item in batch]
-#     texts = [item["text"] for item in batch]
-#     fbanks = [item["fbank"] for item in batch]
-#     text_lens = torch.tensor([item["text_len"] for item in batch], dtype=torch.long)
-#     fbank_lens = torch.tensor([item["fbank_len"] for item in batch], dtype=torch.long)
+def speech_collate_fn(batch):
+    decoder_outputs = [torch.tensor(item["decoder_input"]) for item in batch]
+    texts = [item["text"] for item in batch]
+    fbanks = [item["fbank"] for item in batch]
+    text_lens = torch.tensor([item["text_len"] for item in batch], dtype=torch.long)
+    fbank_lens = torch.tensor([item["fbank_len"] for item in batch], dtype=torch.long)
 
-#     padded_decoder_inputs = pad_sequence(decoder_outputs, batch_first=True, padding_value=0)
-#     padded_texts = pad_sequence(texts, batch_first=True, padding_value=0)       # [B, T_text]
-#     padded_fbanks = pad_sequence(fbanks, batch_first=True, padding_value=0.0)   # [B, T_audio, 80]
+    padded_decoder_inputs = pad_sequence(decoder_outputs, batch_first=True, padding_value=0)
+    padded_texts = pad_sequence(texts, batch_first=True, padding_value=0)       # [B, T_text]
+    padded_fbanks = pad_sequence(fbanks, batch_first=True, padding_value=0.0)   # [B, T_audio, 80]
 
-#     speech_mask=calculate_mask(fbank_lens, padded_fbanks.size(1))      # [B, T]
-#     text_mask=calculate_mask(text_lens, padded_texts.size(1))
+    speech_mask=calculate_mask(fbank_lens, padded_fbanks.size(1))      # [B, T]
+    text_mask=calculate_mask(text_lens, padded_texts.size(1))
 
-#     return {
-#         "decoder_input": padded_decoder_inputs,
-#         "text": padded_texts,
-#         "text_mask": text_mask,
-#         "text_len" : text_lens,
-#         "fbank_len" : fbank_lens,
-#         "fbank": padded_fbanks,
-#         "fbank_mask": speech_mask
-#     }
+    return {
+        "decoder_input": padded_decoder_inputs,
+        "text": padded_texts,
+        "text_mask": text_mask,
+        "text_len" : text_lens,
+        "fbank_len" : fbank_lens,
+        "fbank": padded_fbanks,
+        "fbank_mask": speech_mask
+    }
 
 # ==============================================================
 

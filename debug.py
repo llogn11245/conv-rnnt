@@ -32,7 +32,9 @@ def debug_batch(model, batch, criterion, device, is_training=True):
     print(f"Fbank len shape: {fbank_len.shape}")
     print(f"Text len shape: {text_len.shape}")
     print(f"Target text shape: {target_text.shape}")
+    print(f"Text sample: {target_text[0, :10]}")  # Print first 10 tokens
     print(f"Decoder input shape: {decoder_input.shape}")
+    print(f"Decoder input sample: {decoder_input[0, :10]}")  # Print first 10 tokens
     print(f"================MODEL================")
     # Set model mode
     if is_training:
