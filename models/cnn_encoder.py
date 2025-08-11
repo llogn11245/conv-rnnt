@@ -146,17 +146,19 @@ class CNNEncoder(nn.Module):
         self.global_cnn = global_cnn
         self.projected = nn.Linear(d_input * 2, d_output)  
     def forward(self, x):
-        print(f"x.shape: {x.shape}")
+        # print(f"x.shape: {x.shape}")
         x = x.unsqueeze(1)
         local_out = self.local_cnn(x)  # [B, 64, T, F]
-        print(f"local_out.shape: {local_out.shape}")
+        # print(f"local_out.shape: {local_out.shape}")
         global_out = self.global_cnn(local_out)  # [B, T, 64*F]
-        print(f"global_out.shape: {global_out.shape}")
-        # concat = torch.cat([local_out, global_out], dim=2)  # [B, T, 128*F]
+        # print(f"global_out.shape: {global_out.shape}")
+        concat = torch.cat([local_out, global_out], dim=2)  # [B, T, 128*F]
         # print(f"concat.shape: {concat.shape}")
         
-        # output = self.projected(concat)  # [B, T, 128*F] -> [B, T, d_input]
-        return global_out
+        output = self.projected(concat)  # [B, T, 128*F] -> [B, T, d_input]
+        # print(output.shape)
+        # exit()
+        return output
     
 def build_cnn_encoder(config):
     local_cnn = LocalCNNEncoder(

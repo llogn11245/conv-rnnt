@@ -48,13 +48,13 @@ model:
 training:
   epochs: 100
   batch_size: 2
-  save_path: "save"
-  voice_path: "C:\\paper\\raw_data\\Vietnamese-Speech-to-Text-datasets\\ViVOS\\voices"
-  train_path : "C:\\paper\\raw_data\\Vietnamese-Speech-to-Text-datasets\\ViVOS\\train_w2i.json"
-  dev_path : "C:\\paper\\raw_data\\Vietnamese-Speech-to-Text-datasets\\ViVOS\\test_w2i.json"
-  test_path : "C:\\paper\\raw_data\\Vietnamese-Speech-to-Text-datasets\\ViVOS\\test_w2i.json"
-  vocab_path : "C:\\paper\\raw_data\\Vietnamese-Speech-to-Text-datasets\\ViVOS\\vocab_w2i.json"
-  reload: True
+  save_path: "workspace/conv-rnnt/saves"
+  voice_path: "workspace/dataset/voices"
+  train_path : "workspace/dataset/train_w2i.json"
+  dev_path : "workspace/dataset/test_w2i.json"
+  test_path : "workspace/dataset/test_w2i.json"
+  vocab_path : "workspace/dataset/vocab_w2i.json"
+  reload: False
 
 
 optim:
@@ -67,7 +67,7 @@ optim:
   # decay_rate: 0.5
 
   type: adam
-  lr: 0.0005
+  lr: 0.001
   weight_decay: 0
   decay_rate: 0.5
 
